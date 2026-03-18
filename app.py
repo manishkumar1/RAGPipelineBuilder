@@ -1,4 +1,4 @@
-from src.data_loader import load_all_documents
+from src.libs.data_loader import load_all_documents
 from src.vectorstore import FaissVectorStore
 from src.search import RAGSearch
 
