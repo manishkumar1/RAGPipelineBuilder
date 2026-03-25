@@ -1,10 +1,11 @@
 import os
+import sys
 import faiss
 import numpy as np
 import pickle
 from typing import List, Any
 from sentence_transformers import SentenceTransformer
-from src.embedding import EmbeddingPipeline
+from embedding import EmbeddingPipeline
 
 class FaissVectorStore:
     def __init__(self, persist_dir: str = "faiss_store", embedding_model: str = "all-MiniLM-L6-v2", chunk_size: int = 1000, chunk_overlap: int = 200):
@@ -68,7 +69,7 @@ class FaissVectorStore:
 
 # Example usage
 if __name__ == "__main__":
-    from src.libs.data_loader import load_all_documents
+    from data_loader import load_all_documents
     docs = load_all_documents("data")
     store = FaissVectorStore("faiss_store")
     store.build_from_documents(docs)
