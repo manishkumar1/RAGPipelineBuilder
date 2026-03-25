@@ -4,11 +4,10 @@ import uuid
 import numpy as np
 import chromadb
 from typing import List, Any
-from data.constants import vector_db_name
 class VectorStore:
     """Manages document embeddings in a ChromaDB vector store"""
     
-    def __init__(self, collection_name: str = vector_db_name, persist_directory: str = "../data/vector_store"):
+    def __init__(self, collection_name: str, persist_directory: str = "../data/vector_store"):
         """
         Initialize the vector store
         
