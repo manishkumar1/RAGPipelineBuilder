@@ -1,6 +1,6 @@
 # RAG Pipeline
 
-A Retrieval-Augmented Generation (RAG) system that lets you query your documents through a chat-based Web UI. It ingests PDFs, Word docs, Excel sheets, CSVs, and text files — chunks and embeds them into ChromaDB — then answers questions using Groq's LLM with cited sources.
+A Retrieval-Augmented Generation (RAG) system that lets you query your documents through a chat-based Web UI backed by a FastAPI service. It ingests PDFs, Word docs, Excel sheets, CSVs, and text files — chunks and embeds them into ChromaDB — then answers questions using Groq's LLM with cited sources.
 
 ---
 
@@ -21,7 +21,7 @@ Documents (PDF, DOCX, XLSX, TXT, CSV)
                                                   │
                                           Context Assembly
                                                   │
-                                        Groq LLM (gemma2-9b-it)
+                                     Groq LLM (llama-3.1-8b-instant)
                                                   │
                                           Answer + Citations
 ```
@@ -42,13 +42,14 @@ Documents (PDF, DOCX, XLSX, TXT, CSV)
 │       ├── search.py
 │       └── vectorstore.py
 ├── data/
-│   ├── constants.py           # Model names, collection name
+│   ├── constants.py           # Model names, collection name, API key fallback
 │   ├── pdf/                   # Place PDF documents here
 │   ├── text_files/            # Place TXT documents here
 │   ├── excelsheet/            # Place Excel documents here
 │   └── vector_store/          # ChromaDB persisted store (auto-created)
 ├── notebook/                  # Jupyter notebooks for each pipeline stage
-├── webui.py                   # Gradio web UI
+├── api.py                     # FastAPI backend (port 8000)
+├── webui.py                   # HTML Web UI served via FastAPI (port 7860)
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .env.example
@@ -78,10 +79,13 @@ cp .env.example .env
 
 # 3. Build and run
 docker compose up --build
-
-# 4. Open the Web UI
-# http://localhost:7860
 ```
+
+| Service | URL |
+|---------|-----|
+| Web UI | http://localhost:7860 |
+| API (Swagger) | http://localhost:8000/docs |
+| API (ReDoc) | http://localhost:8000/redoc |
 
 To stop:
 
@@ -89,7 +93,7 @@ To stop:
 docker compose down
 ```
 
-The `./data` folder is mounted as a volume, so your vector store and documents persist across container rebuilds.
+The `./data` folder is mounted as a volume so your vector store and documents persist across container rebuilds.
 
 ---
 
@@ -107,10 +111,97 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env and add your GROQ_API_KEY
 
-# 4. Launch the Web UI
-python webui.py
-# Open http://localhost:7860
+# 4. Start the API (Terminal 1)
+uvicorn api:app --host 0.0.0.0 --port 8000 --reload
+
+# 5. Start the Web UI (Terminal 2)
+uvicorn webui:app --host 0.0.0.0 --port 7860
 ```
+
+---
+
+## API Reference
+
+The API is documented interactively via Swagger UI at **`http://localhost:8000/docs`**.
+
+### Endpoints
+
+#### `GET /health`
+Returns API status and the number of indexed chunks.
+
+```json
+{ "status": "ok", "vector_store_chunks": 525 }
+```
+
+---
+
+#### `POST /query`
+Ask a question against the knowledge base.
+
+**Request body:**
+```json
+{
+  "question": "What is the attention mechanism?",
+  "top_k": 5,
+  "min_score": 0.2,
+  "summarize": false
+}
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `question` | string | required | Natural language question |
+| `top_k` | int | 5 | Number of chunks to retrieve (1–20) |
+| `min_score` | float | 0.2 | Minimum similarity score (0.0–1.0) |
+| `summarize` | bool | false | Append a 2-sentence summary to the answer |
+
+**Response:**
+```json
+{
+  "question": "What is the attention mechanism?",
+  "answer": "The attention mechanism allows... \n\nCitations:\n[1] attention.pdf (page 2)",
+  "sources": [
+    {
+      "source": "attention.pdf",
+      "page": 2,
+      "score": 0.8731,
+      "preview": "Attention is a mechanism that..."
+    }
+  ],
+  "summary": null
+}
+```
+
+---
+
+#### `POST /ingest`
+Load and index documents from a local folder into the vector store.
+
+**Request body:**
+```json
+{ "data_dir": "data" }
+```
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "documents_loaded": 102,
+  "chunks": 525
+}
+```
+
+> Documents are auto-ingested on startup if the vector store is empty. Re-running ingest adds chunks on top — clear `data/vector_store/` manually for a full re-index.
+
+---
+
+## Web UI Features
+
+- Chat interface for conversational Q&A over your documents
+- Retrieved sources panel with similarity scores and text previews
+- Adjustable retrieval settings per query (Top-K, min score)
+- Optional answer summarization
+- Ingest panel to re-index documents without restarting
 
 ---
 
@@ -124,7 +215,9 @@ Place your documents in the appropriate sub-folders under `data/` before startin
 | TXT | `data/text_files/` |
 | Excel (`.xlsx`, `.xls`) | `data/excelsheet/` |
 
-Then run the ingestion notebooks in order from the `notebook/` folder:
+The API auto-ingests on startup if the vector store is empty. You can also trigger it manually via the `/ingest` endpoint or the Ingest panel in the Web UI.
+
+Alternatively, run the ingestion notebooks in `notebook/`:
 
 | Notebook | Purpose |
 |----------|---------|
@@ -132,20 +225,6 @@ Then run the ingestion notebooks in order from the `notebook/` folder:
 | `document_loader.ipynb` | Load TXT / DOCX files |
 | `excel_loader.ipynb` | Load Excel files |
 | `confluence_loader.ipynb` | Load pages from Confluence |
-
-Or use the `src/libs/data_loader.py` `load_all_documents()` function directly in a script.
-
----
-
-## Web UI Features
-
-- **Chat interface** — conversational question answering over your documents
-- **Retrieved sources panel** — shows which document chunks were used, with similarity scores and previews
-- **Retrieval settings** (adjustable per query):
-  - Top-K — number of document chunks to retrieve (1–10)
-  - Min similarity score — filters out low-confidence chunks
-- **Summarize toggle** — adds a 2-sentence summary below the full answer
-- **Clear** — resets the conversation and query history
 
 ---
 
@@ -156,18 +235,9 @@ Or use the `src/libs/data_loader.py` `load_all_documents()` function directly in
 | `GROQ_API_KEY` | `.env` | Your Groq API key (required) |
 | `vector_db_name` | `data/constants.py` | ChromaDB collection name |
 | `embedding_model_name` | `data/constants.py` | SentenceTransformer model |
+| `groq_model_name` | `data/constants.py` | Groq LLM model ID |
 
-Default model: `gemma2-9b-it` via Groq. Other supported Groq models: `llama3-70b-8192`, `mixtral-8x7b-32768`.
-
----
-
-## Pipeline Flow Diagrams
-
-Visual diagrams are available in the `flow_images/` folder:
-
-- `ragpipelineflow.jpg` — end-to-end RAG flow
-- `queryingestionpipelineflow.jpg` — ingestion pipeline
-- `querygenerationflow.jpg` — query generation flow
+Default LLM: `llama-3.1-8b-instant`. Other available Groq models: `llama-3.3-70b-versatile`, `qwen/qwen3-32b`.
 
 ---
 
@@ -179,5 +249,6 @@ Visual diagrams are available in the `flow_images/` folder:
 | Embeddings | `sentence-transformers` (all-MiniLM-L6-v2) |
 | Vector Store | [ChromaDB](https://www.trychroma.com) |
 | Document Loading | `langchain-community` |
-| Web UI | [Gradio](https://gradio.app) |
+| API | [FastAPI](https://fastapi.tiangolo.com) + Uvicorn |
+| API Docs | Swagger UI (`/docs`) · ReDoc (`/redoc`) |
 | Orchestration | [LangChain](https://python.langchain.com) |

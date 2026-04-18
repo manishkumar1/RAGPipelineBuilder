@@ -22,7 +22,7 @@ class EmbeddingManager:
         try:
             print(f"Loading embedding model: {self.model_name}")
             self.model = SentenceTransformer(self.model_name)
-            print(f"Model loaded successfully. Embedding dimension: {self.model.get_sentence_embedding_dimension()}")
+            print(f"Model loaded successfully. Embedding dimension: {self.model.get_embedding_dimension()}")
         except Exception as e:
             print(f"Error loading model {self.model_name}: {e}")
             raise

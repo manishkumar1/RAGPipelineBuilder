@@ -4,7 +4,7 @@ from langchain.messages import HumanMessage, SystemMessage
 import os
 
 class GroqLLM:
-    def __init__(self, model_name: str = "gemma2-9b-it", api_key: str =None):
+    def __init__(self, model_name: str = "llama-3.1-8b-instant", api_key: str = None):
         """
         Initialize Groq LLM
         
@@ -26,6 +26,14 @@ class GroqLLM:
         )
         
         print(f"Initialized Groq LLM with model: {self.model_name}")
+
+    def invoke(self, messages):
+        """Delegate invoke to the underlying ChatGroq instance."""
+        from langchain.messages import HumanMessage
+        # pipeline passes a list with a single prompt string
+        if messages and isinstance(messages[0], str):
+            messages = [HumanMessage(content=messages[0])]
+        return self.llm.invoke(messages)
 
     def generate_response(self, query: str, context: str, max_length: int = 500) -> str:
         """
