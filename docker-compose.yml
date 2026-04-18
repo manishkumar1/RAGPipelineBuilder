@@ -1,0 +1,12 @@
+services:
+  rag-webui:
+    build: .
+    container_name: rag-webui
+    ports:
+      - "7860:7860"
+    env_file:
+      - .env
+    volumes:
+      # Persist vector store and uploaded data between restarts
+      - ./data:/app/data
+    restart: unless-stopped
