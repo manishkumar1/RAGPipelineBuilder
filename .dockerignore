@@ -1,0 +1,10 @@
+.git
+.env
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+.DS_Store
+notebook/
+agenticrag/
+flow_images/

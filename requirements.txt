@@ -14,3 +14,4 @@ langgraph
 atlassian-python-api
 unstructured
 msoffcrypto-tool
+gradio
