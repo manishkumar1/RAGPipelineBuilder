@@ -14,4 +14,12 @@ langgraph
 atlassian-python-api
 unstructured
 msoffcrypto-tool
-gradio
+openpyxl
+pandas
+fastapi
+uvicorn[standard]
+httpx
+jinja2
+authlib
+itsdangerous
+requests
